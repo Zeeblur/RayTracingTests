@@ -32,7 +32,7 @@ public:
 class metal : public material
 {
 public:
-	metal(const vec3& a, float f)
+	metal(const vec3& a, float f)  
 	{
 		albedo = a;
 		fuzz = (f < 1) ? f : 1;

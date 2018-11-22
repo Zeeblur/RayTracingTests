@@ -44,7 +44,7 @@ bool dielectric::refract(const vec3& v, const vec3& n, float ni_over_nt, vec3& r
 {
 	vec3 uv = normalize(v);
 	float dt = dot(uv, n);
-	float discriminant = 1.0 - ni_over_nt * ni_over_nt * (1 - dt * dt);
+	float discriminant = 1.0f - ni_over_nt * ni_over_nt * (1 - dt * dt);
 	if (discriminant > 0)
 	{
 		refracted = ni_over_nt * (uv - n * dt) - n * sqrt(discriminant);
@@ -71,12 +71,14 @@ bool dielectric::scatter(const ray& r_in, const hit_record& rec, vec3& attenuati
 	{
 		outward_normal = -rec.normal;
 		ni_over_nt = ref_idx;
-		cosine = ref_idx * dot(r_in.direction(), rec.normal) / r_in.direction().length();
+	//	cosine = ref_idx * dot(r_in.direction(), rec.normal) / r_in.direction().length();
+		cosine = dot(r_in.direction(), rec.normal) / r_in.direction().length();
+		cosine = sqrt(1 - ref_idx * ref_idx*(1 - cosine * cosine));
 	}
 	else
 	{
 		outward_normal = rec.normal;
-		ni_over_nt = 1.0 / ref_idx;
+		ni_over_nt = 1.0f / ref_idx;
 		cosine = -dot(r_in.direction(), rec.normal) / r_in.direction().length();
 	}
 
@@ -86,7 +88,6 @@ bool dielectric::scatter(const ray& r_in, const hit_record& rec, vec3& attenuati
 	}
 	else
 	{
-		scattered = ray(rec.p, reflected);
 		reflect_prob = 1.0;
 	}
 
