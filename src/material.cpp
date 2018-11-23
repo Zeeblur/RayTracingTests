@@ -91,7 +91,7 @@ bool dielectric::scatter(const ray& r_in, const hit_record& rec, vec3& attenuati
 		reflect_prob = 1.0;
 	}
 
-	if (Utils::unif(Utils::rng) < reflect_prob)
+	if (unif(Utils::rng) < reflect_prob)
 	{
 		scattered = ray(rec.p, reflected);
 	}

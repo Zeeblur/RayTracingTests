@@ -1,7 +1,7 @@
 #include "camera.h"
 #include <glm/gtc/constants.hpp>
 
-camera::camera(glm::vec3 lookfrom, glm::vec3 lookat, glm::vec3 vup, float vfov, float aspect) // vertical field of view top to bottom in degrees
+static_cam::static_cam(glm::vec3 lookfrom, glm::vec3 lookat, glm::vec3 vup, float vfov, float aspect) // vertical field of view top to bottom in degrees
 {
 	glm::vec3 u, v, w;
 	float theta = vfov * pi<float>() / 180;
@@ -18,10 +18,13 @@ camera::camera(glm::vec3 lookfrom, glm::vec3 lookat, glm::vec3 vup, float vfov, 
 
 	horizontal = 2 * half_width * u;
 	vertical = 2 * half_height * v;
+
+	// init camera distribution
+	std::uniform_real_distribution<double> unif(0, 1);
 }
 
 
-ray camera::get_ray(float s, float t)
+ray static_cam::get_ray(float s, float t)
 {
 	return ray(origin, lower_left_corner + s * horizontal + t * vertical - origin); 
 }
@@ -42,8 +45,8 @@ dof_cam::dof_cam(glm::vec3 lookfrom, glm::vec3 lookat, vec3 vup, float vfov, flo
 
 	lower_left_corner = origin - half_width * focus_dist * u - half_height * focus_dist * v - focus_dist * w;
 
-	horizontal = 2 * half_width * u;
-	vertical = 2 * half_height * v;
+	horizontal = 2 * half_width * focus_dist * u;
+	vertical = 2 * half_height * focus_dist *v;
 }
 
 ray dof_cam::get_ray(float s, float t)
