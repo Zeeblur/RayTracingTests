@@ -23,7 +23,7 @@ public:
 		glm::vec3 p;
 
 		do {
-			p = 2.0f * glm::vec3(Utils::unif(Utils::rng), Utils::unif(Utils::rng), 0) - glm::vec3(1,1,0);
+			p = 2.0f * glm::vec3(Utils::unif(Utils::rng), Utils::unif(Utils::rng), 0) - glm::vec3(1, 1, 0);
 		} while (dot(p, p) >= 1.0);
 
 		return p;

@@ -110,11 +110,14 @@ int main()
 		{
 			vec3 col(0);
 
+			// 1 distribution for each pixel
+			std::uniform_real_distribution<double> unif(0, 1);
+					   
 			for (int s = 0; s < ns; s++)
 			{
 				// calculate uv coords
-				float u = float(i + Utils::unif(Utils::rng)) / float(nx);
-				float v = float(j + Utils::unif(Utils::rng)) / float(ny);
+				float u = float(i + unif(Utils::rng)) / float(nx);
+				float v = float(j + unif(Utils::rng)) / float(ny);
 
 				ray r = cam->get_ray(u, v);
 				vec3 p = r.hit_point(2.0);
