@@ -49,10 +49,15 @@ include_directories("${glm_SOURCE_DIR}")
 
 
 # ray TEST:
-file(GLOB_RECURSE SOURCES src/*.cpp src/*.h external/*.h)
+file(GLOB_RECURSE SOURCESRAY src/raytracing/*.cpp src/raytracing/*.h external/*.h)
 
-add_executable(raytest ${SOURCES})
+add_executable(raytest ${SOURCESRAY})
 target_link_libraries (raytest  ${EXTRA_LIBS})
+
+file(GLOB_RECURSE SOURCESPLAT src/platform/*.cpp src/platform/*.h external/*.h)
+
+add_executable(rayplatform ${SOURCESPLAT})
+target_link_libraries (rayplatform  ${EXTRA_LIBS})
 
 
   
