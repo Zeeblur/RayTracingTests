@@ -11,7 +11,7 @@ namespace glfw
 {
     GLFWwindow* window;
 
-    int runWindow(int resX, int resY, bool windowed)
+    int runWindow(int resX, int resY)
     {
         // Initialise GLFW
         if (!glfwInit())
