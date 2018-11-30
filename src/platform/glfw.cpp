@@ -1,11 +1,7 @@
-//
-// Created by zoe on 03/10/17.
-//
 #include <fstream>
 #include <string>
 #include <vector>
 #include "glfw.h"
-
 
 namespace glfw
 {
@@ -27,8 +23,8 @@ namespace glfw
 		window = glfwCreateWindow(resX, resY, "Vulkan window", nullptr, nullptr);
 
 		// create call back gfor resize
-		//glfwSetWindowUserPointer(window, Renderer::get());
-		//glfwSetWindowSizeCallback(window, Renderer::onWindowResized);
+		//glfwSetWindowUserPointer(window, vulkan_platform::get());
+		//glfwSetWindowSizeCallback(window, vulkan_platform::onWindowResized);
 
 
         return 0;
