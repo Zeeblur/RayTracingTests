@@ -111,7 +111,7 @@ bool renderer::load_content()
 void renderer::update(float delta_time)
 {
     // Should never be called
-    std::cout << "Renderer updating" << std::endl;
+   // std::cout << "Renderer updating" << std::endl;
 
 }
 

@@ -39,6 +39,12 @@ bool vulkan_platform::initialise()
 	//createTextureImageView();
 	//createTextureSampler();
 
+	createVertexBuffer();
+	createIndexBuffer();
+	createUniformBuffer();
+	createDescriptorPool();
+	createDescriptorSet();
+
 	createCommandBuffers();
 	createSemaphores();
 
@@ -389,6 +395,10 @@ void vulkan_platform::createLogicalDevice()
 		VkDeviceQueueCreateInfo qCreateInfo;
 		qCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 
+		// need to ensure these are null so no garbage
+		qCreateInfo.flags = 0;
+		qCreateInfo.pNext = NULL;
+
 		// this is either graphics/surface etc
 		qCreateInfo.queueFamilyIndex = queueFam;
 
@@ -722,32 +732,33 @@ void vulkan_platform::createRenderPass()
 	colourAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	colourAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-	// dpeth attachment
-	VkAttachmentDescription depthAttachment = {};
-	depthAttachment.format = findDepthFormat();
-	depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-	depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	//// dpeth attachment
+	//VkAttachmentDescription depthAttachment = {};
+	//depthAttachment.format = findDepthFormat();
+	//depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	//depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	//depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	//depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	//depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	//depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	//depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	// Subpasses and attachments.
 	// 1 render pass can be multiple subpasses (i.e post processing)
 	VkAttachmentReference colourAttachmentRef = {};
 	colourAttachmentRef.attachment = 0;
 	colourAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-	VkAttachmentReference depthAttachmentRef = {};
-	depthAttachmentRef.attachment = 1;
-	depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	//VkAttachmentReference depthAttachmentRef = {};
+	//depthAttachmentRef.attachment = 1;
+	//depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	// just do 1 subpass for now specify the colour attachgment
 	VkSubpassDescription subpass = {};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &colourAttachmentRef;   // INDEX OF THIS IS THE LAYOUT LOCATION IN THE SHADER
-	subpass.pDepthStencilAttachment = &depthAttachmentRef;
+	//subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
 	// create subpass dependencies 
 	// specify operations to wait on and where they occur. - need to wait for the swap chain to finish reading before accessing it
@@ -755,12 +766,12 @@ void vulkan_platform::createRenderPass()
 	// this prevents the render pass from transistioning before we need to start writing colours to it
 
 	// array of depthbuffer
-	std::array<VkAttachmentDescription, 2> attachments = { colourAttachment, depthAttachment };
+	std::array<VkAttachmentDescription, 1> attachments = { colourAttachment };
 
 	//// CREATE RENDER PASS
 
 	// Subpass dependencies for layout transitions
-	std::array<VkSubpassDependency, 2> dependencies;
+	std::array<VkSubpassDependency, 1> dependencies;
 
 	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
 	dependencies[0].dstSubpass = 0;
@@ -770,13 +781,13 @@ void vulkan_platform::createRenderPass()
 	dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 	dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
-	dependencies[1].srcSubpass = 0;
-	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-	dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-	dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-	dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+	//dependencies[1].srcSubpass = 0;
+	//dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+	//dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	//dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	//dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	//dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	//dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
 	VkRenderPassCreateInfo renderPassInfo = {};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -804,18 +815,18 @@ void vulkan_platform::createDescriptorSetLayout()
 	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // uniform for vertex
 	uboLayoutBinding.pImmutableSamplers = nullptr; // for image sampling
 
-	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
-	samplerLayoutBinding.binding = 1;
-	samplerLayoutBinding.descriptorCount = 1;
-	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	samplerLayoutBinding.pImmutableSamplers = nullptr;
-	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	//VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
+	//samplerLayoutBinding.binding = 1;
+	//samplerLayoutBinding.descriptorCount = 1;
+	//samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	//samplerLayoutBinding.pImmutableSamplers = nullptr;
+	//samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	std::vector<VkDescriptorSetLayoutBinding> bindings;
 
 	// create info + create!  // default two 
 	bindings.push_back(uboLayoutBinding);
-	bindings.push_back(samplerLayoutBinding);
+//	bindings.push_back(samplerLayoutBinding);
 
 	// if lighting need 2nd texture sampler
 	//if (lighting)
@@ -842,8 +853,8 @@ void vulkan_platform::createDescriptorSetLayout()
 // these need to be recreated with any shader change etc.
 void vulkan_platform::createGraphicsPipeline()
 {
-	std::string vert = "vert";
-	std::string frag = "frag";
+	std::string vert = "tri_vert";
+	std::string frag = "basic_frag";
 
 	//// read in shader files.
 	//if (lighting)
@@ -1059,8 +1070,8 @@ void vulkan_platform::createGraphicsPipeline()
 	pipelineInfo.basePipelineIndex = -1; // Optional
 
 
-	// create the pipeline!
-	if (vkCreateGraphicsPipelines(device, pipeCache, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS)
+	// create the pipeline! //TODO PUT CACHE BACK IN
+	if (vkCreateGraphicsPipelines(device, nullptr, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS)
 		throw std::runtime_error("Couldn't create graphics pipeline!");
 
 
@@ -1079,7 +1090,7 @@ void vulkan_platform::createFramebuffers()
 	// iterate through all images and create a frame buffer from each
 	for (size_t i = 0; i < swapChainImageViews.size(); ++i)
 	{
-		std::array<VkImageView, 2> attachments = { swapChainImageViews[i], depthImageView };
+		std::array<VkImageView, 1> attachments = { swapChainImageViews[i] };
 
 		VkFramebufferCreateInfo frameBufferInfo = {};
 		frameBufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -1114,7 +1125,6 @@ void vulkan_platform::createCommandPool()
 		throw std::runtime_error("failed to create command pool!");
 
 }
-
 
 // record the commands!
 void vulkan_platform::createCommandBuffers()
@@ -1296,6 +1306,249 @@ void vulkan_platform::render()
 	vkQueueWaitIdle(presentQueue);
 
 }
+
+/// ** create descriptor sets/pool **///
+
+// specifies a buffer resource to bind the uniform descriptor to
+void vulkan_platform::createDescriptorPool()
+{
+	// how many and what type
+	VkDescriptorPoolSize poolSize = {};
+	poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSize.descriptorCount = 1;
+
+	VkDescriptorPoolCreateInfo poolInfo = {};
+	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.poolSizeCount = 1;
+	poolInfo.pPoolSizes = &poolSize;
+	poolInfo.maxSets = 1; // max sets to allocate
+
+	// create it
+	if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS)
+		throw std::runtime_error("failed to create descriptor pool!");
+
+
+}
+
+// allocate the descriptors. - pool to allocate from, how many to allocate, and the layout to base them on
+void vulkan_platform::createDescriptorSet()
+{
+	VkDescriptorSetLayout layouts[] = { descriptorSetLayout };
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = descriptorPool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = layouts;
+
+	// allocate
+	if (vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet) != VK_SUCCESS)
+		throw std::runtime_error("failed to allocate descriptor set!");
+
+	//// auto freed when pool is destroyed.
+	//// configure which buffer and region of buffer
+	VkDescriptorBufferInfo bufferInfo = {};
+	bufferInfo.buffer = uniformBuffer;
+	bufferInfo.offset = 0;
+	bufferInfo.range = sizeof(UniformBufferObject);
+
+	//VkDescriptorImageInfo imageInfo = {};
+	//imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	//imageInfo.imageView = textureImageView;
+	//imageInfo.sampler = textureSampler;
+
+	std::array<VkWriteDescriptorSet, 1> descriptorWrites = {};
+
+	// descriptions are updated using UpdateSets... Takes in a write set
+	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[0].dstSet = descriptorSet; // which to update
+	descriptorWrites[0].dstBinding = 0;			// binding (in the shader layout)
+	descriptorWrites[0].dstArrayElement = 0;	// can be arrays so specify index
+	descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;   	// specify type.
+	descriptorWrites[0].descriptorCount = 1;
+	descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+	// this is for textures
+	//descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	//descriptorWrites[1].dstSet = descriptorSet;
+	//descriptorWrites[1].dstBinding = 1;
+	//descriptorWrites[1].dstArrayElement = 0;
+	//descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	//descriptorWrites[1].descriptorCount = 1;
+	//descriptorWrites[1].pImageInfo = &imageInfo;
+
+	vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+}
+
+/// ** create buffers ** //
+
+// create vertex buffer objs
+void vulkan_platform::createVertexBuffer()
+{
+	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+	// create a staging buffer as a temp buffer and then the device has a local vertex  buffer.
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+	// copy data to buffer
+	void* data;
+	// map buffer memory to the cpu
+	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+
+	// Copy vertex data into the mapped memory
+	memcpy(data, vertices.data(), (size_t)bufferSize);
+
+	// unmap buffer
+	vkUnmapMemory(device, stagingBufferMemory);
+
+	// create vertex buffer
+	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+
+	// local so can't use map., so have to copy data between buffers.
+	copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+	// clean up staging buffer
+	vkDestroyBuffer(device, stagingBuffer, nullptr);
+	vkFreeMemory(device, stagingBufferMemory, nullptr);
+}
+
+// create index buffer
+void vulkan_platform::createIndexBuffer()
+{
+	// buffersize is the number of incides times the size of the index type (unit32/16)
+	VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+	void* data;
+	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+	memcpy(data, indices.data(), (size_t)bufferSize);
+	vkUnmapMemory(device, stagingBufferMemory);
+
+	// note usage is INDEX buffer. 
+	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+
+	copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+
+	vkDestroyBuffer(device, stagingBuffer, nullptr);
+	vkFreeMemory(device, stagingBufferMemory, nullptr);
+}
+
+// create uniform Buffer
+void vulkan_platform::createUniformBuffer()
+{
+	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+	createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffer, uniformBufferMemory);
+}
+
+// create buffer in memory - allocate and map
+void vulkan_platform::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
+{
+	// create struct as usual
+	VkBufferCreateInfo bufferInfo = {};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	// how big is the buffer (enough to store the size of 1 obj * how many)
+	bufferInfo.size = size;
+
+	// what purpose is this buffer going to be used for ( can use multiple things)
+	bufferInfo.usage = usage;
+
+	// buffer only used by the graphics queue so it can be exclusive
+	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	// create it
+	if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create buffer");
+	}
+
+	// Memory requirements
+	VkMemoryRequirements memRequirements;
+	vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+	// determine memory type to allocate 
+	VkMemoryAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+
+	// allocate memory
+	if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS)
+		throw std::runtime_error("Failed to allocate buffer memory");
+
+	// bind memory to the buffer (int is offset)
+	vkBindBufferMemory(device, buffer, bufferMemory, 0);
+}
+
+// copy data between buffers
+void vulkan_platform::copyBuffer(VkBuffer srcBuff, VkBuffer targetBuff, VkDeviceSize size)
+{
+	VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+	VkBufferCopy copyRegion = {};
+	copyRegion.size = size;
+	vkCmdCopyBuffer(commandBuffer, srcBuff, targetBuff, 1, &copyRegion);
+
+	endSingleTimeCommands(commandBuffer);
+
+}
+
+
+VkCommandBuffer vulkan_platform::beginSingleTimeCommands() {
+	VkCommandBufferAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandPool = gfxCommandPool;
+	allocInfo.commandBufferCount = 1;
+
+	VkCommandBuffer commandBuffer;
+	vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+
+	VkCommandBufferBeginInfo beginInfo = {};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+	vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+	return commandBuffer;
+}
+
+void vulkan_platform::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
+	vkEndCommandBuffer(commandBuffer);
+
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffer;
+
+	vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(graphicsQueue);
+
+	vkFreeCommandBuffers(device, gfxCommandPool, 1, &commandBuffer);
+}
+
+// query info
+uint32_t vulkan_platform::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+{
+	// query info about the avaliable types of memory
+	VkPhysicalDeviceMemoryProperties memProperties;
+	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+	// check and return index if desired properties are found.
+	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+	{
+		if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+		{
+			return i;
+		}
+	}
+
+	throw std::runtime_error("Failed to fins suitable memory type!");
+}
+
 
 /// *** clean-up *** ///
 

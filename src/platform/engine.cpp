@@ -27,7 +27,7 @@ std::shared_ptr<subsystem> engine::get_subsystem(const std::string &name)
 void engine::run()
 {
     initGraphics();
-    initSubsystems();
+    //initSubsystems();
     mainLoop();
     cleanup();
 }
@@ -79,33 +79,36 @@ void engine::mainLoop()
 
     while (_running && glfwWindowShouldClose(window) == 0)
     {
-        //std::cout << "Engine Running" << std::endl;
-		auto newTime = std::chrono::system_clock::now();
 
-		float frameTime = std::chrono::duration_cast<std::chrono::milliseconds>(newTime - currentTime).count();
-		currentTime = newTime;
+		glfwPollEvents();
+		vulkan_platform::get()->render();
+  //      //std::cout << "Engine Running" << std::endl;
+		//auto newTime = std::chrono::system_clock::now();
 
-		// variable delta time
-		float deltaTime = frameTime / 1000.0f; // std::min (dt) ?
-		// Update the subsystems. 
-		for (auto &sys : _subsystems)
-			if (sys.second->get_active())
-				sys.second->update(deltaTime);
+		//float frameTime = std::chrono::duration_cast<std::chrono::milliseconds>(newTime - currentTime).count();
+		//currentTime = newTime;
 
-        while(thread_pool::get()->jd_.jobs_.size() != 0)
-        {
-            // wait on the threads to finish
-        }
+		//// variable delta time
+		//float deltaTime = frameTime / 1000.0f; // std::min (dt) ?
+		//// Update the subsystems. 
+		//for (auto &sys : _subsystems)
+		//	if (sys.second->get_active())
+		//		sys.second->update(deltaTime);
 
-        // Render the subsystems.
-        for (auto &sys : _subsystems)
-            if (sys.second->get_visible())
-                sys.second->render();
+  //      while(thread_pool::get()->jd_.jobs_.size() != 0)
+  //      {
+  //          // wait on the threads to finish
+  //      }
 
-        while(thread_pool::get()->jd_.jobs_.size() != 0)
-        {
-            // wait on the threads to finish
-        }
+  //      // Render the subsystems.
+  //      for (auto &sys : _subsystems)
+  //          if (sys.second->get_visible())
+  //              sys.second->render();
+
+  //      while(thread_pool::get()->jd_.jobs_.size() != 0)
+  //      {
+  //          // wait on the threads to finish
+  //      }
     }
 
 	engine::get()->set_running(false);

@@ -150,7 +150,7 @@ class vulkan_platform : public subsystem
 public:
 	inline static std::shared_ptr<vulkan_platform> get()
 	{
-		std::shared_ptr<vulkan_platform> instance(new vulkan_platform);
+		static std::shared_ptr<vulkan_platform> instance(new vulkan_platform);
 		return instance;
 	}
 
@@ -224,7 +224,6 @@ private:
 	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
 
-
 	// things that may need to be altered.
 	void createImageViews();
 	void createRenderPass();
@@ -236,6 +235,19 @@ private:
 	void createSemaphores();
 	void recreateSwapChain();
 
+	void createVertexBuffer();
+	void createIndexBuffer();
+	void createUniformBuffer();
+
+	void createDescriptorPool();
+	void createDescriptorSet();
+
+
+	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+	void copyBuffer(VkBuffer srcBuff, VkBuffer targetBuff, VkDeviceSize size);
+	VkCommandBuffer beginSingleTimeCommands();
+	void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
 
 
