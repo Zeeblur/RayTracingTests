@@ -195,6 +195,19 @@ private:
 	// TODO: this needs to be modified to accept different pools etc
 	VkCommandPool gfxCommandPool;
 	std::vector<VkCommandBuffer> commandBuffers;
+	VkSemaphore imageAvailableSemaphore;
+	VkSemaphore renderFinishedSemaphore;
+
+	// buffers TODO: update this
+	VkBuffer vertexBuffer;
+	VkDeviceMemory vertexBufferMemory;
+	VkBuffer indexBuffer;
+	VkDeviceMemory indexBufferMemory;
+	VkBuffer uniformBuffer;
+	VkDeviceMemory uniformBufferMemory;
+
+	VkDescriptorPool descriptorPool;
+	VkDescriptorSet descriptorSet;
 
 	//Vulkan Instance methods
 	void createInstance();
@@ -219,8 +232,9 @@ private:
 	void createGraphicsPipeline();
 	void createFramebuffers();
 	void createCommandPool();
-
-
+	void createCommandBuffers(); // here
+	void createSemaphores();
+	void recreateSwapChain();
 
 
 

@@ -33,18 +33,21 @@ bool vulkan_platform::initialise()
 	createDescriptorSetLayout();
 	createGraphicsPipeline();
 	createCommandPool();
-	//createDepthResources();
+//	createDepthResources();
 	createFramebuffers();
 	//createTextureImage();
 	//createTextureImageView();
 	//createTextureSampler();
+
+	createCommandBuffers();
+	createSemaphores();
 
 	return true;
 }
 
 bool vulkan_platform::load_content() { return true; }
 void vulkan_platform::update(float delta_time) {}
-void vulkan_platform::render() {}
+//void vulkan_platform::render() {}  // replaced by draw frame
 void vulkan_platform::unload_content() {}
 void vulkan_platform::shutdown() {}
 
@@ -1113,7 +1116,203 @@ void vulkan_platform::createCommandPool()
 }
 
 
+// record the commands!
+void vulkan_platform::createCommandBuffers()
+{
+	// resize allocation for frame buffers
+	commandBuffers.resize(swapChainFramebuffers.size());
+
+	// allocate the buffers
+	VkCommandBufferAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.commandPool = gfxCommandPool;
+
+	// primary can be submitted to a queue for execution but cannot be called from other command buffers
+	// secondary cannot be submitted but can be called from primary buffers
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
+
+	if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS)
+	{
+		throw std::runtime_error("failed to allocate command buffers!");
+	}
+
+	// record into command buffers
+	for (size_t i = 0; i < commandBuffers.size(); i++)
+	{
+		// begin recording command buffer
+		VkCommandBufferBeginInfo beginInfo = {};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+		// command buffer can be resubmitted whilst already pending execution - so can scheduling drawing for next frame whilst last frame isn't finished
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+		beginInfo.pInheritanceInfo = nullptr; // Optional - only relevant for secondary cmd buffers
+
+		// this call resets command buffer as not possible to ammend
+		vkBeginCommandBuffer(commandBuffers[i], &beginInfo);
+
+		// Start the render pass
+		VkRenderPassBeginInfo renderPassInfo = {};
+		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		// render pass and it's attachments to bind (in this case a colour attachment from the frambuffer)
+		renderPassInfo.renderPass = renderPass;
+		renderPassInfo.framebuffer = swapChainFramebuffers[i];
+
+		// size of render area
+		renderPassInfo.renderArea.offset = { 0, 0 };
+		renderPassInfo.renderArea.extent = swapChainExtent;
+
+		// set clear colour vals
+		std::array<VkClearValue, 2> clearValues = {};
+		clearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
+		clearValues[1].depthStencil = { 1.0f, 0 };
+
+		renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+		renderPassInfo.pClearValues = clearValues.data();
+
+		// begin pass - command buffer to record to, the render pass details, how the commands are provided (from 1st/2ndary)
+		vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+		// BIND THE PIPELINE
+		vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+		// bind the vbo
+		VkBuffer vertexBuffers[] = { vertexBuffer };
+		VkDeviceSize offsets[] = { 0 };
+		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+
+		// bind index & uniforms
+		vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+
+		// DRAW A TRIANGLEEEEE!!!?"!?!!?!?!?!?!?!
+		// vertex count, instance count, first vertex/ first instance. - used for offsets
+		vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
+		// end the pass
+		vkCmdEndRenderPass(commandBuffers[i]);
+
+		// check if failed recording
+		if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS)
+			throw std::runtime_error("failed to record command buffer!");
+
+	}
+
+
+}
+
+// create semaphores for rendering synchronisation
+void vulkan_platform::createSemaphores()
+{
+	VkSemaphoreCreateInfo semaphoreInfo = {};
+	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	// 2 semaphores for if the image is ready (from the swapchain) and iuf the render is finished from the command buffer
+	if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS ||
+		vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS)
+	{
+		throw std::runtime_error("failed to create semaphores!");
+	}
+}
+
+// * draw * //
+
+// get image from swapchain, execute command buffer with that image in the framebuffer, return the image to the swap chain for presentation
+void vulkan_platform::render()
+{
+	// asynchronous calls so need to use semaphores/fences
+
+	// 1.  get image from swapchain
+	uint32_t imageIndex;
+	// logical device, swapchain, timeout (max here), signaled when engine is finished using the image, output when it's become available.
+	VkResult result = vkAcquireNextImageKHR(device, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		recreateSwapChain();
+		return;
+	}
+	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+		throw std::runtime_error("failed to acquire swap chain image!");
+
+	// 2. Submitting the command buffer
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+	// wait for if the image is avalible from the swapchain and stored in imageIndex
+	VkSemaphore waitSemaphores[] = { imageAvailableSemaphore };
+
+	// Wait at the colour stage of the pipeline - theoretically can implement the vertex shader whilst the image is not ready
+	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = waitSemaphores;
+	submitInfo.pWaitDstStageMask = waitStages;
+
+	// which command buffers to submit for exe - the one that binds the swap chain image we aquired as a colour attachment
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
+
+	// which semaphores to signal once the command buffers have finished execution.
+	VkSemaphore signalSemaphores[] = { renderFinishedSemaphore };
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = signalSemaphores;
+
+	// submit to queue with signal info. // last param is a fence but we're using semaphores
+	if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
+		throw std::runtime_error("failed to submit draw command buffer!");
+
+
+	// should return true when render is finished
+
+	// 3. submit the result back to the swap chain
+	VkPresentInfoKHR presentInfo = {};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+	// wait for the render to have finished before starting
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = signalSemaphores;
+
+	// specify which swapchain to present the image to
+	VkSwapchainKHR swapChains[] = { swapChain };
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = swapChains;
+	presentInfo.pImageIndices = &imageIndex;
+
+	// can specify array of results to check if presentation is successful, but not needed if only 1 swapchain 
+	presentInfo.pResults = nullptr; // Optional
+
+	result = vkQueuePresentKHR(presentQueue, &presentInfo);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+	{
+		recreateSwapChain();
+	}
+	else if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("failed to present swap chain image!");
+	}
+
+	// wait until presentation is finished before drawing the next frame
+	vkQueueWaitIdle(presentQueue);
+
+}
+
 /// *** clean-up *** ///
+
+void vulkan_platform::recreateSwapChain()
+{
+	vkDeviceWaitIdle(device);
+
+	cleanupSwapChain();
+
+	createSwapChain();
+	createImageViews();
+	createRenderPass();
+	createGraphicsPipeline();
+	//createDepthResources();
+	createFramebuffers();
+	createCommandBuffers();
+}
 
 
 void vulkan_platform::cleanupSwapChain()
