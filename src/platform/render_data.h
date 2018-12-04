@@ -3,6 +3,8 @@
 #include <string>
 #include <glm/glm.hpp>
 
+#include "vkEffect.h"
+
 struct render_data
 {
 	bool visible;
@@ -16,8 +18,8 @@ struct render_data
 
 	std::string parent_name;
 
-	// Reference to structs
-	//std::shared_ptr<gl::Effect> effect;
+	// Reference to structs  // TODO this should be changed to platform/effect
+	std::shared_ptr<vkEffect> effect;
 
 	// shape is now mesh
 	//std::shared_ptr<gl::mesh_geom> mesh;

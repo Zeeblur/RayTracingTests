@@ -33,11 +33,11 @@ bool vulkan_platform::initialise()
 	createDescriptorSetLayout();
 	createGraphicsPipeline();
 	createCommandPool();
-	createDepthResources();
+	//createDepthResources();
 	createFramebuffers();
-	createTextureImage();
-	createTextureImageView();
-	createTextureSampler();
+	//createTextureImage();
+	//createTextureImageView();
+	//createTextureSampler();
 
 	return true;
 }
@@ -790,31 +790,355 @@ void vulkan_platform::createRenderPass()
 
 }
 
+// what needs to be accessed within a shader (ubo/texturesamplers)
+void vulkan_platform::createDescriptorSetLayout()
+{
+	// bind through a layoutstruct  -- set as uniform buffer
+	VkDescriptorSetLayoutBinding uboLayoutBinding = {};
+	uboLayoutBinding.binding = 0;
+	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	uboLayoutBinding.descriptorCount = 1; // can have an array (different MVP for each animation etc)
+	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // uniform for vertex
+	uboLayoutBinding.pImmutableSamplers = nullptr; // for image sampling
+
+	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
+	samplerLayoutBinding.binding = 1;
+	samplerLayoutBinding.descriptorCount = 1;
+	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	samplerLayoutBinding.pImmutableSamplers = nullptr;
+	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	std::vector<VkDescriptorSetLayoutBinding> bindings;
+
+	// create info + create!  // default two 
+	bindings.push_back(uboLayoutBinding);
+	bindings.push_back(samplerLayoutBinding);
+
+	// if lighting need 2nd texture sampler
+	//if (lighting)
+	//{
+	//	VkDescriptorSetLayoutBinding samplerLayoutBindingNorm = {};
+	//	samplerLayoutBindingNorm.binding = 2;
+	//	samplerLayoutBindingNorm.descriptorCount = 1;
+	//	samplerLayoutBindingNorm.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	//	samplerLayoutBindingNorm.pImmutableSamplers = nullptr;
+	//	samplerLayoutBindingNorm.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	//	bindings.push_back(samplerLayoutBindingNorm);
+	//}
+
+	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+	layoutInfo.pBindings = bindings.data();
+
+	if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create descriptior set layout!");
+}
+
+// these need to be recreated with any shader change etc.
+void vulkan_platform::createGraphicsPipeline()
+{
+	std::string vert = "vert";
+	std::string frag = "frag";
+
+	//// read in shader files.
+	//if (lighting)
+	//{
+	//	// use phong shaders
+	//	vert += "_phong";
+	//	frag += "_phong";
+	//}
+
+	auto vertShaderCode = readFile("res/shaders/" + vert + ".spv");
+	auto fragShaderCode = readFile("res/shaders/" + frag + ".spv");
+
+	// modules only needed in creation of pipeline so can be destroyed locally
+	VkShaderModule vertShaderMod;
+	VkShaderModule fragShaderMod;
+
+	vertShaderMod = createShaderModule(vertShaderCode);
+	fragShaderMod = createShaderModule(fragShaderCode);
+
+	// assign the shaders
+	VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
+	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vertShaderStageInfo.module = vertShaderMod;
+	vertShaderStageInfo.pName = "main";		// function to invoke
+
+	// can use here specialisation info to specify shader constant values
+
+	// assign the fragment
+	VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
+	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragShaderStageInfo.module = fragShaderMod;
+	fragShaderStageInfo.pName = "main";		// function to invoke
+
+	// define array for these structs
+	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+	// define fixed functions - explict about data bindings and attributes
+	std::vector<VkVertexInputBindingDescription> bindingDesc;
+	std::vector<VkVertexInputAttributeDescription> attributeDesc;
+
+	// get binding and attribute descriptions  
+	bindingDesc.push_back(Vertex::getBindingDescription());	     // binding for vertex
+	//bindingDesc.push_back(InstanceBO::getBindingDescription());  // binding for instance
+
+	for (auto &d : Vertex::getAttributeDescription())
+	{
+		attributeDesc.push_back(d);
+	}
+
+	//// push back instance attributes
+	//for (auto &d : InstanceBO::getAttributeDescription())
+	//{
+	//	attributeDesc.push_back(d);
+	//}
+
+	VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
+	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	// where is it bound
+	vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDesc.size());
+	vertexInputInfo.pVertexBindingDescriptions = bindingDesc.data();
+
+	// size of att desc
+	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDesc.size());
+	vertexInputInfo.pVertexAttributeDescriptions = attributeDesc.data();
+
+	// specify the geometry to draw fdrom the vertices can use topology or element buffers here
+	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+	// specify the viewport - region of frame buffer to output to - usually 0 - width
+	VkViewport viewport = {};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = (float)swapChainExtent.width;
+	viewport.height = (float)swapChainExtent.height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	// scissor rectangle is like a filter - region in where to store the pixels 
+	VkRect2D scissor = {};
+	scissor.offset = { 0, 0 };
+	scissor.extent = swapChainExtent;  // cover the entire viewport for now
+
+	// create a viewport from info
+	VkPipelineViewportStateCreateInfo viewportState = {};
+	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportState.viewportCount = 1;
+	viewportState.pViewports = &viewport;
+	viewportState.scissorCount = 1;
+	viewportState.pScissors = &scissor;
+
+	// rasterizer (can chose wireframe/face culling etc here)
+	VkPipelineRasterizationStateCreateInfo rasteriser = {};
+	rasteriser.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasteriser.depthClampEnable = VK_FALSE;   // clamp frags near planes. useful in shadowmapping
+
+	// discard enable - geom never gets to this srafe and doesn't draw to framebuffer
+	rasteriser.rasterizerDiscardEnable = VK_FALSE;
+
+	// polygon mode - fill or wireframe etc
+	rasteriser.polygonMode = VK_POLYGON_MODE_FILL;
+	rasteriser.lineWidth = 1.0f;
+
+	// cull faces and vertex winding order
+	rasteriser.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasteriser.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+	// can use this for shadows - alter depth biasing
+	rasteriser.depthBiasEnable = VK_FALSE;
+	rasteriser.depthBiasConstantFactor = 0.0f; // Optional
+	rasteriser.depthBiasClamp = 0.0f; // Optional
+	rasteriser.depthBiasSlopeFactor = 0.0f; // Optional
+
+
+	// anti-aliasing setup - currently set to false
+	VkPipelineMultisampleStateCreateInfo multisampling = {};
+	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisampling.sampleShadingEnable = VK_FALSE;
+	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	multisampling.minSampleShading = 1.0f; // Optional
+	multisampling.pSampleMask = nullptr; // Optional
+	multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
+	multisampling.alphaToOneEnable = VK_FALSE; // Optional
+
+	// set up depth buffer and stenciling if needed here
+
+	VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	depthStencil.depthTestEnable = VK_TRUE;
+	depthStencil.depthWriteEnable = VK_TRUE;
+	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+	depthStencil.depthBoundsTestEnable = VK_FALSE;
+	depthStencil.stencilTestEnable = VK_FALSE;
+
+	// colour blending modes
+
+	// blend per frame buffer -- CURRENTLY UNMODIFIED
+	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	colorBlendAttachment.blendEnable = VK_FALSE;
+	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA; // Optional
+	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA; // Optional
+	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
+	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
+	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
+	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
+
+	// blending for global settings
+	VkPipelineColorBlendStateCreateInfo colorBlending = {};
+	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlending.logicOpEnable = VK_FALSE;
+	colorBlending.logicOp = VK_LOGIC_OP_COPY; // Optional
+	colorBlending.attachmentCount = 1;
+	colorBlending.pAttachments = &colorBlendAttachment;
+	colorBlending.blendConstants[0] = 0.0f; // Optional
+	colorBlending.blendConstants[1] = 0.0f; // Optional
+	colorBlending.blendConstants[2] = 0.0f; // Optional
+	colorBlending.blendConstants[3] = 0.0f; // Optional
+
+
+	// dynamic states - can change some values without recreating the pipeline
+	VkDynamicState dynamicStates[] =
+	{
+		VK_DYNAMIC_STATE_VIEWPORT,		// able to resize window
+		VK_DYNAMIC_STATE_LINE_WIDTH		// able to change line width
+	};
+
+	VkPipelineDynamicStateCreateInfo dynamicState = {};
+	dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamicState.dynamicStateCount = 2;
+	dynamicState.pDynamicStates = dynamicStates;
+
+
+	// Set-up pipeline layout for uniform locations
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipelineLayoutInfo.setLayoutCount = 1; // layout for uniforms
+	pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+	pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
+	pipelineLayoutInfo.pPushConstantRanges = 0; // Optional
+
+	// create pipeline
+	if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create pipeline layout!");
+	}
+
+	VkGraphicsPipelineCreateInfo pipelineInfo = {};
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipelineInfo.stageCount = 2; // vert & frag
+	pipelineInfo.pStages = shaderStages;
+
+	// reference the arrays of the create info structs
+	pipelineInfo.pVertexInputState = &vertexInputInfo;
+	pipelineInfo.pInputAssemblyState = &inputAssembly;
+	pipelineInfo.pViewportState = &viewportState;
+	pipelineInfo.pRasterizationState = &rasteriser;
+	pipelineInfo.pMultisampleState = &multisampling;
+	pipelineInfo.pDepthStencilState = &depthStencil;
+	pipelineInfo.pColorBlendState = &colorBlending;
+	pipelineInfo.pDynamicState = nullptr; // Optional
+
+	// ref fixed function and render pass
+	pipelineInfo.layout = pipelineLayout;
+	pipelineInfo.renderPass = renderPass;
+	pipelineInfo.subpass = 0; // index of subpass where pipeline is to be used.
+
+	// can derive pipelines from existing ones.
+	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
+	pipelineInfo.basePipelineIndex = -1; // Optional
+
+
+	// create the pipeline!
+	if (vkCreateGraphicsPipelines(device, pipeCache, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS)
+		throw std::runtime_error("Couldn't create graphics pipeline!");
+
+
+	// cleanup
+	vkDestroyShaderModule(device, fragShaderMod, nullptr);
+	vkDestroyShaderModule(device, vertShaderMod, nullptr);
+
+}
+
+// create frame buffers for the images in the swap chain
+void vulkan_platform::createFramebuffers()
+{
+	// resize list for size of swap chain images
+	swapChainFramebuffers.resize(swapChainImageViews.size());
+
+	// iterate through all images and create a frame buffer from each
+	for (size_t i = 0; i < swapChainImageViews.size(); ++i)
+	{
+		std::array<VkImageView, 2> attachments = { swapChainImageViews[i], depthImageView };
+
+		VkFramebufferCreateInfo frameBufferInfo = {};
+		frameBufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		frameBufferInfo.renderPass = renderPass;
+		frameBufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+		frameBufferInfo.pAttachments = attachments.data();
+		frameBufferInfo.width = swapChainExtent.width;
+		frameBufferInfo.height = swapChainExtent.height;
+		frameBufferInfo.layers = 1;
+
+		if (vkCreateFramebuffer(device, &frameBufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS)
+			throw std::runtime_error("Failed to create frame buffer!");
+
+	}
+
+}
+
+// record operations to perform (like drawing and memory transfers) in command buffer objects
+// command pool stores these buffers 
+void vulkan_platform::createCommandPool()
+{
+	QueueFamilyIndices queueFamilyIndices = findQueuesFamilies(physicalDevice);
+
+	// record commands for drawing on the graphics queue
+	VkCommandPoolCreateInfo poolInfo = {};
+	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily;
+	poolInfo.flags = 0; // Optional - for recreating them
+
+	// create the pool
+	if (vkCreateCommandPool(device, &poolInfo, nullptr, &gfxCommandPool) != VK_SUCCESS)
+		throw std::runtime_error("failed to create command pool!");
+
+}
+
+
+/// *** clean-up *** ///
 
 
 void vulkan_platform::cleanupSwapChain()
 {
-	//vkDestroyImageView(device, depthImageView, nullptr);
-	//vkDestroyImage(device, depthImage, nullptr);
-	//vkFreeMemory(device, depthImageMemory, nullptr);
+	vkDestroyImageView(device, depthImageView, nullptr);
+	vkDestroyImage(device, depthImage, nullptr);
+	vkFreeMemory(device, depthImageMemory, nullptr);
 
-	//for (size_t i = 0; i < swapChainFramebuffers.size(); i++)
-	//{
-	//	vkDestroyFramebuffer(device, swapChainFramebuffers[i], nullptr);
-	//}
+	for (size_t i = 0; i < swapChainFramebuffers.size(); i++)
+	{
+		vkDestroyFramebuffer(device, swapChainFramebuffers[i], nullptr);
+	}
 
-	//vkFreeCommandBuffers(device, gfxCommandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
+	vkFreeCommandBuffers(device, gfxCommandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
 
-	//vkDestroyPipeline(device, graphicsPipeline, nullptr);
-	//vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-	//vkDestroyRenderPass(device, renderPass, nullptr);
+	vkDestroyPipeline(device, graphicsPipeline, nullptr);
+	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+	vkDestroyRenderPass(device, renderPass, nullptr);
 
-	//for (size_t i = 0; i < swapChainImageViews.size(); i++)
-	//{
-	//	vkDestroyImageView(device, swapChainImageViews[i], nullptr);
-	//}
+	for (size_t i = 0; i < swapChainImageViews.size(); i++)
+	{
+		vkDestroyImageView(device, swapChainImageViews[i], nullptr);
+	}
 
-	//vkDestroySwapchainKHR(device, swapChain, nullptr);
+	vkDestroySwapchainKHR(device, swapChain, nullptr);
 }
 
 void vulkan_platform::cleanup()
