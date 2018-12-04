@@ -9,7 +9,9 @@
 #include <algorithm>
 #include "glfw.h"
 #include <array>
-
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <chrono>
 
 
 bool vulkan_platform::initialise()
@@ -1230,6 +1232,7 @@ void vulkan_platform::createSemaphores()
 // get image from swapchain, execute command buffer with that image in the framebuffer, return the image to the swap chain for presentation
 void vulkan_platform::render()
 {
+	std::cout << "rendereing" << std::endl;
 	// asynchronous calls so need to use semaphores/fences
 
 	// 1.  get image from swapchain
@@ -1347,7 +1350,7 @@ void vulkan_platform::createDescriptorSet()
 	//// auto freed when pool is destroyed.
 	//// configure which buffer and region of buffer
 	VkDescriptorBufferInfo bufferInfo = {};
-	bufferInfo.buffer = uniformBuffer;
+	bufferInfo.buffer = uniformBuffers[0];
 	bufferInfo.offset = 0;
 	bufferInfo.range = sizeof(UniformBufferObject);
 
@@ -1441,7 +1444,32 @@ void vulkan_platform::createIndexBuffer()
 void vulkan_platform::createUniformBuffer()
 {
 	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-	createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffer, uniformBufferMemory);
+
+	uniformBuffers.resize(swapChainImages.size());
+	uniformBuffersMemory.resize(swapChainImages.size());
+
+	for (size_t i = 0; i < swapChainImages.size(); i++) {
+		createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
+	}
+}
+
+void vulkan_platform::updateUniformBuffer(uint32_t currentImage)
+{
+	static auto startTime = std::chrono::high_resolution_clock::now();
+
+	auto currentTime = std::chrono::high_resolution_clock::now();
+	float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+	UniformBufferObject ubo = {};
+	ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
+	ubo.proj[1][1] *= -1;
+
+	void* data;
+	vkMapMemory(device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
+	memcpy(data, &ubo, sizeof(ubo));
+	vkUnmapMemory(device, uniformBuffersMemory[currentImage]);
 }
 
 // create buffer in memory - allocate and map

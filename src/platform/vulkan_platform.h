@@ -203,8 +203,11 @@ private:
 	VkDeviceMemory vertexBufferMemory;
 	VkBuffer indexBuffer;
 	VkDeviceMemory indexBufferMemory;
-	VkBuffer uniformBuffer;
-	VkDeviceMemory uniformBufferMemory;
+
+	std::vector<VkBuffer> uniformBuffers;
+	std::vector<VkDeviceMemory> uniformBuffersMemory;
+
+	void updateUniformBuffer(uint32_t currentImage);
 
 	VkDescriptorPool descriptorPool;
 	VkDescriptorSet descriptorSet;
