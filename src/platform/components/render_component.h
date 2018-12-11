@@ -3,7 +3,7 @@
 #include <iostream>
 #include "../entity.h"
 #include "component.h"
-#include "../glfw.h"
+
 //#include "../opengl_util.h"
 #include <glm/glm.hpp>
 
@@ -26,7 +26,7 @@ private:
 
 	std::shared_ptr<render_data> _data;
     std::shared_ptr<entity> _parent;
-	GLuint programID;
+	int programID;
 public:
 	render_component(std::shared_ptr<entity> e, std::shared_ptr<render_data> data);
 

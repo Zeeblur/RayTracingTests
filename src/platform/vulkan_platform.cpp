@@ -13,9 +13,34 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
 
+int vulkan_platform::runWindow(int resX, int resY)
+{
+	// Initialise GLFW
+	if (!glfwInit())
+	{
+		fprintf(stderr, "Failed to initialize GLFW\n");
+		getchar();
+		return -1;
+	}
+
+
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+	window = glfwCreateWindow(resX, resY, "Vulkan window", nullptr, nullptr);
+
+	// create call back gfor resize
+	//glfwSetWindowUserPointer(window, vulkan_platform::get());
+	//glfwSetWindowSizeCallback(window, vulkan_platform::onWindowResized);
+
+
+	return 0;
+
+}
+
 
 bool vulkan_platform::initialise()
 {
+
 	uint32_t extensionCount = 0;
 	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
 
@@ -532,7 +557,7 @@ VkPresentModeKHR vulkan_platform::chooseSwapPresentMode(const std::vector<VkPres
 VkExtent2D vulkan_platform::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities)
 {
 	int width, height;
-	glfwGetWindowSize(glfw::window, &width, &height);
+	glfwGetWindowSize(window, &width, &height);
 
 	// some wm allow whatever
 	if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
@@ -574,7 +599,7 @@ VkShaderModule vulkan_platform::createShaderModule(const std::vector<char>& code
 // create surface for interfacing with GLFW to render things on screen
 void vulkan_platform::createSurface()
 {
-	if (glfwCreateWindowSurface(instance, glfw::window, nullptr, &surface) != VK_SUCCESS)
+	if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create glfw surface.");
 }
 
@@ -1216,14 +1241,33 @@ void vulkan_platform::createCommandBuffers()
 // create semaphores for rendering synchronisation
 void vulkan_platform::createSemaphores()
 {
+	//VkSemaphoreCreateInfo semaphoreInfo = {};
+	//semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	//// 2 semaphores for if the image is ready (from the swapchain) and iuf the render is finished from the command buffer
+	//if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS ||
+	//	vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS)
+	//{
+	//	throw std::runtime_error("failed to create semaphores!");
+	//}
+
+	imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+	renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+	inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
 	VkSemaphoreCreateInfo semaphoreInfo = {};
 	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-	// 2 semaphores for if the image is ready (from the swapchain) and iuf the render is finished from the command buffer
-	if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS ||
-		vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to create semaphores!");
+	VkFenceCreateInfo fenceInfo = {};
+	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+		if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
+			vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
+			vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create synchronization objects for a frame!");
+		}
 	}
 }
 
@@ -1235,10 +1279,14 @@ void vulkan_platform::render()
 	std::cout << "rendereing" << std::endl;
 	// asynchronous calls so need to use semaphores/fences
 
+
+	vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
+
+
 	// 1.  get image from swapchain
 	uint32_t imageIndex;
 	// logical device, swapchain, timeout (max here), signaled when engine is finished using the image, output when it's become available.
-	VkResult result = vkAcquireNextImageKHR(device, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+	VkResult result = vkAcquireNextImageKHR(device, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
 	{
@@ -1253,7 +1301,7 @@ void vulkan_platform::render()
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
 	// wait for if the image is avalible from the swapchain and stored in imageIndex
-	VkSemaphore waitSemaphores[] = { imageAvailableSemaphore };
+	VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] };
 
 	// Wait at the colour stage of the pipeline - theoretically can implement the vertex shader whilst the image is not ready
 	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
@@ -1266,12 +1314,14 @@ void vulkan_platform::render()
 	submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
 
 	// which semaphores to signal once the command buffers have finished execution.
-	VkSemaphore signalSemaphores[] = { renderFinishedSemaphore };
+	VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame]};
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = signalSemaphores;
 
-	// submit to queue with signal info. // last param is a fence but we're using semaphores
-	if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
+	vkResetFences(device, 1, &inFlightFences[currentFrame]);
+
+	// submit to queue with signal info. // last param is a fence 
+	if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS)
 		throw std::runtime_error("failed to submit draw command buffer!");
 
 
@@ -1305,8 +1355,8 @@ void vulkan_platform::render()
 		throw std::runtime_error("failed to present swap chain image!");
 	}
 
-	// wait until presentation is finished before drawing the next frame
-	vkQueueWaitIdle(presentQueue);
+	
+	currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 
 }
 

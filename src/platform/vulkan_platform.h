@@ -21,6 +21,8 @@ const bool enableValidationLayers = false;
 const bool enableValidationLayers = true;
 #endif
 
+const int MAX_FRAMES_IN_FLIGHT = 2;
+
 const std::vector<const char*> validationLayers = {
 	"VK_LAYER_LUNARG_standard_validation"
 };
@@ -162,6 +164,9 @@ public:
 	void shutdown();
 
 	bool amdGPU = false;
+	GLFWwindow* window;
+	int runWindow(int resX, int resY);
+
 
 private:
 
@@ -195,8 +200,11 @@ private:
 	// TODO: this needs to be modified to accept different pools etc
 	VkCommandPool gfxCommandPool;
 	std::vector<VkCommandBuffer> commandBuffers;
-	VkSemaphore imageAvailableSemaphore;
-	VkSemaphore renderFinishedSemaphore;
+	std::vector<VkSemaphore> imageAvailableSemaphores;
+	std::vector<VkSemaphore> renderFinishedSemaphores;
+	std::vector<VkFence> inFlightFences;
+	size_t currentFrame = 0;
+
 
 	// buffers TODO: update this
 	VkBuffer vertexBuffer;
@@ -251,6 +259,7 @@ private:
 	VkCommandBuffer beginSingleTimeCommands();
 	void endSingleTimeCommands(VkCommandBuffer commandBuffer);
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
 
 
 

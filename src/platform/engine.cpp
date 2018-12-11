@@ -7,7 +7,6 @@
 #include <sstream>
 #include <iomanip>
 #include <fstream>
-using namespace glfw;
 
 void engine::add_subsystem(const std::string &name, std::shared_ptr<subsystem> sys)
 {
@@ -35,7 +34,7 @@ void engine::run()
 void engine::initWindowMan()
 {	
 	// insert resolution here
-	glfw::runWindow(600, 400);
+	vulkan_platform::get()->runWindow(600, 400);
 }
 
 void engine::initGraphics()
@@ -77,7 +76,7 @@ void engine::mainLoop()
 
 	auto currentTime = std::chrono::system_clock::now();
 
-    while (_running && glfwWindowShouldClose(window) == 0)
+    while (_running && glfwWindowShouldClose(vulkan_platform::get()->window) == 0)
     {
 
 		glfwPollEvents();

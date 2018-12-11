@@ -3,6 +3,7 @@
 //
 #define GLM_ENABLE_EXPERIMENTAL
 #include "camera_component.h"
+#include "../vulkan_platform.h"
 
 camera_component::camera_component(std::shared_ptr<entity> &e, std::shared_ptr<camera_projection> data)
 	: _parent(e), _data(data)
@@ -23,7 +24,7 @@ void camera_component::shutdown() {}
 void camera_component::set_projection_view(std::shared_ptr<camera_projection> data)
 {
 	int width = 0, height = 0;
-	glfwGetWindowSize(glfw::window, &width, &height);
+	glfwGetWindowSize(vulkan_platform::get()->window, &width, &height);
 	_data = data;
 	switch(data->type)
 	{
