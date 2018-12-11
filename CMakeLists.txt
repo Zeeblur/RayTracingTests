@@ -58,6 +58,9 @@ file(GLOB_RECURSE SOURCESPLAT src/platform/*.cpp src/platform/*.h external/*.h)
 
 add_executable(rayplatform ${SOURCESPLAT})
 target_link_libraries (rayplatform  ${EXTRA_LIBS})
+target_link_libraries (rayplatform glfw)
+target_link_libraries (rayplatform vulkan-1)
+target_include_directories(rayplatform PRIVATE external/)
 
 
   
