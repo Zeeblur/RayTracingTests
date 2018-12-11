@@ -1,11 +1,11 @@
 #include "material.h"
 #include "utils.h"
 
-vec3 random_in_unit_sphere()
+vec3 material::random_in_unit_sphere() const
 {
 	vec3 p;
 	do {
-		p = 2.0f * vec3(Utils::unif(Utils::rng), Utils::unif(Utils::rng), Utils::unif(Utils::rng)) - vec3(1.0);
+		p = 2.0f * vec3(unif(Utils::rng), unif(Utils::rng), unif(Utils::rng)) - vec3(1.0);
 	} while (length2(p) >= 1.0);
 
 	return p;
@@ -91,7 +91,7 @@ bool dielectric::scatter(const ray& r_in, const hit_record& rec, vec3& attenuati
 		reflect_prob = 1.0;
 	}
 
-	if (Utils::unif(Utils::rng) < reflect_prob)
+	if (unif(Utils::rng) < reflect_prob)
 	{
 		scattered = ray(rec.p, reflected);
 	}

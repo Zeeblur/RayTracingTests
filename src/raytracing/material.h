@@ -11,11 +11,11 @@
 class material
 {
 public:
-	//std::mt19937_64 rng;
-	//std::uniform_real_distribution<double> unif;
+	std::uniform_real_distribution<double> unif;
 	virtual bool scatter(const ray& r_in, const hit_record& rec, vec3& attenuation, ray& scattered) const = 0;
 	vec3 reflect(const vec3& v, const vec3& n) const;
 	vec3 albedo;
+	vec3 random_in_unit_sphere() const;
 };
 
 
