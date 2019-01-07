@@ -7,6 +7,30 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include "engine.h"
+
+bool vulkan_platform::initialise()
+{
+	initWindow();
+	initVulkan();
+
+	return true;
+}
+
+void vulkan_platform::update(float delta_time)
+{
+	glfwPollEvents();
+	updateUniformBuffer(delta_time);
+}
+
+void vulkan_platform::render()
+{
+	drawFrame();
+}
+
+bool vulkan_platform::load_content() { return true; } // this needs to be where the images and files are loaded 
+void vulkan_platform::unload_content() { vkDeviceWaitIdle(device); }
+void vulkan_platform::shutdown() { cleanup(); }
 
 void vulkan_platform::initWindow()
 {
@@ -19,6 +43,8 @@ void vulkan_platform::initWindow()
 	// create call back gfor resize
 	glfwSetWindowUserPointer(window, this);
 	glfwSetWindowSizeCallback(window, vulkan_platform::onWindowResized);
+
+	engine::get()->window = window;
 }
 
 void vulkan_platform::initVulkan()
@@ -46,19 +72,6 @@ void vulkan_platform::initVulkan()
 	createDescriptorSet();
 	createCommandBuffers();
 	createSemaphores();
-}
-
-void vulkan_platform::mainLoop()
-{
-	while (!glfwWindowShouldClose(window))
-	{
-		glfwPollEvents();
-		updateUniformBuffer();
-		drawFrame();
-	}
-
-	vkDeviceWaitIdle(device);
-
 }
  
 void vulkan_platform::cleanupSwapChain()
@@ -261,7 +274,7 @@ void vulkan_platform::createLogicalDevice()
 		
 		// need to ensure these are null so no garbage
 		qCreateInfo.flags = 0;
-		qCreateInfo.pNext = NULL;
+		qCreateInfo.pNext = NULL; 
 
 		// this is either graphics/surface etc
 		qCreateInfo.queueFamilyIndex = queueFam;
@@ -269,7 +282,7 @@ void vulkan_platform::createLogicalDevice()
 		qCreateInfo.pQueuePriorities = &queuePriority;
 		qCreateInfo.queueCount = 1;
 
-		// add to list
+		// add to list 
 		queueCreateInfos.push_back(qCreateInfo);
 	}
 	
@@ -1463,18 +1476,13 @@ void vulkan_platform::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
 	vkFreeCommandBuffers(device, gfxCommandPool, 1, &commandBuffer);
 }
 
-void vulkan_platform::updateUniformBuffer()
+void vulkan_platform::updateUniformBuffer(float delta_time)
 {
-	static auto startTime = std::chrono::high_resolution_clock::now();
-
-	auto currentTime = std::chrono::high_resolution_clock::now();
-	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
-
 	UniformBufferObject ubo = {};
-	ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
-	ubo.proj[1][1] *= -1;  // winding order is anti-clockwise
+	ubo.model = glm::mat4(1.0);//glm::rotate(glm::mat4(1.0f), delta_time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	// _position, _target, _up;
+	ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, -4.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	ubo.proj =  glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
 
 	void* data;
 	vkMapMemory(device, uniformBufferMemory, 0, sizeof(ubo), 0, &data);

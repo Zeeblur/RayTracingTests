@@ -12,8 +12,7 @@
 #include <algorithm>
 #include <fstream>
 #include <array>
-
-
+#include "subsystem.h"
 
 // if debugging - do INSTANCE validation layers
 #ifdef NDEBUG
@@ -146,7 +145,7 @@ struct UniformBufferObject
 	glm::mat4 proj;
 };
 
-class vulkan_platform
+class vulkan_platform : public subsystem
 {
 private:
 	GLFWwindow* window;
@@ -191,7 +190,6 @@ private:
 
 	void initWindow();
 	void initVulkan();
-	void mainLoop();
 	void cleanup();
 	void cleanupSwapChain();
 	 
@@ -249,7 +247,7 @@ private:
 	void createSemaphores();
 
 	void drawFrame();
-	void updateUniformBuffer();
+	void updateUniformBuffer(float delta_time);
 
 
 	// checks
@@ -299,11 +297,18 @@ private:
 	const int HEIGHT = 600;
 
 public:
-	void run()
+
+	inline static std::shared_ptr<vulkan_platform> get()
 	{
-		initWindow();
-		initVulkan();
-		mainLoop();
-		cleanup();
+		static std::shared_ptr<vulkan_platform> instance(new vulkan_platform());
+		return instance;
 	}
+	   
+	// subsystem overrides
+	bool initialise()				override;
+	bool load_content()				override;
+	void update(float delta_time)	override;
+	void render() 				    override;
+	void unload_content()			override;
+	void shutdown()					override;
 };

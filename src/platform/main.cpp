@@ -1,12 +1,14 @@
 #include <iostream>
-#include "vulkan_platform.h"
+#include "engine.h"
 
 int main() {
 
-	vulkan_platform app;
+	auto app = engine::get();
+
+	app->add_subsystem("vulkan", vulkan_platform::get());
 
 	try {
-		app.run();
+		app->run();
 	}
 	catch (const std::runtime_error& e)
 	{
