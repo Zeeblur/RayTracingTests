@@ -1,46 +1,44 @@
 #include "camera.h"
 #include <glm/gtx/euler_angles.hpp>
 
+camera_component::camera_component(std::shared_ptr<entity> &e, std::shared_ptr<camera_data> data)
+	: _parent(e), _data(data) {}
 
-void free_cam::update(float delta_time)
+void camera_component::update(float delta_time)
 {
+	// TODO: if moveable camera
+	// get rotation and movement from entity.
+	auto transforms = _parent->get_trans();
+	
 	// Calculate the forward direction - spherical coordinates to Cartesian
-	glm::vec3 forward(cosf(_pitch) * -sinf(_yaw), sinf(_pitch), -cosf(_yaw) * cosf(_pitch));
+	glm::vec3 forward(cosf(transforms._pitch) * -sinf(transforms._yaw), sinf(transforms._pitch), -cosf(transforms._yaw) * cosf(transforms._pitch));
 	forward = glm::normalize(forward);
 
 	// Calculate standard right.  Rotate right vector by yaw
-	glm::vec3 right = glm::vec3(glm::eulerAngleY(_yaw) * glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+	glm::vec3 right = glm::vec3(glm::eulerAngleY(transforms._yaw) * glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 	right = glm::normalize(right);
 
 	// Up vector is up rotated by pitch
 	_up = glm::cross(right, forward);
 	_up = glm::normalize(_up);
 
-	// update position
-	glm::vec3 trans = _translation.x * right;
-	trans += _translation.y * _up;
-	trans += _translation.z * forward;
-	_position += trans;
+	//// update position
+	/// can do this if transform component sends message
+	//glm::vec3 trans = _translation.x * right;
+	//trans += _translation.y * _up;
+	//trans += _translation.z * forward;
+	//_position += trans;
 
 	_target = _position + forward;
 
-	// reset translation to zero
-	_translation = glm::vec3(0.0f, 0.0f, 0.0f);
-	
-	// update view matrix
-	_view = glm::lookAt(_position, _target, _up);
+	// set data in struct
+	_data->_up = _up;
+	_data->_target = _target;
+	_data->_position = _position;
 }
 
-
-void free_cam::rotate(float delta_yaw, float delta_pitch)
-{
-	// calculate new orientation
-	_pitch += delta_pitch;
-	_yaw -= delta_yaw;
-}
-
-void free_cam::move(const glm::vec3 &translation)
-{
-	// calculate new translation
-	_translation += translation;
-}
+bool camera_component::initialise(){ return true; }
+bool camera_component::load_content() { return true; }
+void camera_component::render() {} // should never be called
+void camera_component::unload_content() {}
+void camera_component::shutdown() {}

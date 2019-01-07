@@ -59,7 +59,7 @@ void engine::main_loop()
 
 		glfwPollEvents();
 				
-		std::cout << "Engine Running" << std::endl;
+		//std::cout << "Engine Running" << std::endl;
 		auto newTime = std::chrono::system_clock::now();
 
 		float frameTime = std::chrono::duration_cast<std::chrono::milliseconds>(newTime - currentTime).count();
@@ -95,14 +95,7 @@ void engine::cleanup()
 	{
 		sys.second->shutdown();
 	}
-
-
+	
 	// Clear out all the subsystems causing destructors to call.
 	_subsystems.clear();
-
-	
-
-	// Engine will now exit.
-	// Close OpenGL window and terminate GLFW
-	//glfwTerminate();
 }
