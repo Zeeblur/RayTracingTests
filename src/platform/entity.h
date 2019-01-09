@@ -42,7 +42,7 @@ public:
 	inline entity(const std::string& name, transform_data trans, const int& state)
 		: _name(name), _trans(trans), _state(state)
 	{
-		_id = counter++;
+		_id = 0;// counter++;
 	}
 
 	inline transform_data& get_trans() { return _trans; }

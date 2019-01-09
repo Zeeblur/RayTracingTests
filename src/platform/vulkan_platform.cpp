@@ -47,6 +47,11 @@ void vulkan_platform::initWindow()
 	engine::get()->window = window;
 }
 
+void vulkan_platform::get_window_dims(int* width, int* height)
+{
+	glfwGetWindowSize(window, width, height);
+}
+
 void vulkan_platform::initVulkan()
 {
 	createInstance();
@@ -1481,8 +1486,9 @@ void vulkan_platform::updateUniformBuffer(float delta_time)
 	UniformBufferObject ubo = {};
 	ubo.model = glm::mat4(1.0);//glm::rotate(glm::mat4(1.0f), delta_time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 	// _position, _target, _up;
-	ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, -4.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	ubo.proj =  glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
+	auto cameraData = camera_system::get()->get_cam();
+	ubo.view = cameraData._view;
+	ubo.proj = cameraData._projection;
 
 	void* data;
 	vkMapMemory(device, uniformBufferMemory, 0, sizeof(ubo), 0, &data);

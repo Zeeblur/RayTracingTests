@@ -35,7 +35,7 @@ private:
 	std::shared_ptr<entity> _parent;
 
 	vec3 _position = vec3(0.0f);
-	vec3 _target = vec3(0.0f, 0.0f, -1.0f);
+	vec3 _target = vec3(0.0f, 0.0f, 0.0f);
 	vec3 _up = vec3(0.0f, 1.0f, 0.0f);
 
 public:

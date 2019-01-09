@@ -14,6 +14,8 @@
 #include <array>
 #include "subsystem.h"
 
+#include "camera_system.h"
+
 // if debugging - do INSTANCE validation layers
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
@@ -303,7 +305,9 @@ public:
 		static std::shared_ptr<vulkan_platform> instance(new vulkan_platform());
 		return instance;
 	}
-	   
+	
+	void get_window_dims(int* width, int* height);
+
 	// subsystem overrides
 	bool initialise()				override;
 	bool load_content()				override;

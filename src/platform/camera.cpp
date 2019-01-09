@@ -9,6 +9,8 @@ void camera_component::update(float delta_time)
 	// TODO: if moveable camera
 	// get rotation and movement from entity.
 	auto transforms = _parent->get_trans();
+
+	_position = vec3(transforms.x, transforms.y, transforms.z);
 	
 	// Calculate the forward direction - spherical coordinates to Cartesian
 	glm::vec3 forward(cosf(transforms._pitch) * -sinf(transforms._yaw), sinf(transforms._pitch), -cosf(transforms._yaw) * cosf(transforms._pitch));
@@ -29,7 +31,7 @@ void camera_component::update(float delta_time)
 	//trans += _translation.z * forward;
 	//_position += trans;
 
-	_target = _position + forward;
+	//_target = _position + forward;
 
 	// set data in struct
 	_data->_up = _up;

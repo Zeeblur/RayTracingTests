@@ -1,6 +1,25 @@
 #include "camera_system.h"
 #include <iostream>
+#include "vulkan_platform.h"
 
+std::shared_ptr<camera_component> camera_system::build_component(std::shared_ptr<entity> e, Camera_Type type)
+{
+	camera_data proj;
+	int width = 0, height = 0;
+	vulkan_platform::get()->get_window_dims(&width, &height);
+
+	// switch on type here
+	proj.fov = 1.0472f;  // 60 degrees
+	proj.aspect = width/height;
+	proj.near = 0.1f;
+	proj.far = 10.0f;
+	proj.left = -0.5f * (float)width;
+	proj.bottom = -0.5f * (float)height;
+	proj._type = FREE;
+
+	_data.push_back(std::make_shared<camera_data>(proj));
+	return std::make_shared<camera_component>(e, std::ref(_data.back()));
+}
 
 bool camera_system::initialise() { return true; };
 
