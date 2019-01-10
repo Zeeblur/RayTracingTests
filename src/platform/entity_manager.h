@@ -112,7 +112,7 @@ public:
 
 	void update(float delta_time) override final
 	{
-		std::cout << "Entity manager updating" << _entities->size() << std::endl;
+		//std::cout << "Entity manager updating" << _entities->size() << std::endl;
 		for (auto &e : _entities[currentState])
 			if (e.second)
 				e.second->update(delta_time);

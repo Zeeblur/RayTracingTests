@@ -17,7 +17,7 @@ std::shared_ptr<camera_component> camera_system::build_component(std::shared_ptr
 	proj.bottom = -0.5f * (float)height;
 	proj._type = FREE;
 
-	_data.push_back(std::make_shared<camera_data>(proj));
+	_data.push_back(std::make_shared<camera_data>(proj) );
 	return std::make_shared<camera_component>(e, std::ref(_data.back()));
 }
 

@@ -2,6 +2,8 @@
 #include <iostream>
 #include "entity_manager.h"
 #include "camera_system.h"
+#include "physics_system.h"
+#include "input_handler.h"
 #include "engine.h"
 
 enum state_type
